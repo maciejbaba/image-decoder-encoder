@@ -1,3 +1,5 @@
+import { readFileSync, writeFileSync } from 'fs';
+
 enum ImageFormat {
   JPEG = 'jpeg',
   PNG = 'png',
@@ -35,6 +37,42 @@ class ImageDecoder implements ImageDecoderInterface {
     [ImageFormat.SVG]: [0x3c, 0x73, 0x76, 0x67],
   });
 
+  createHtmlWithImage(image: DecodedImage): void {
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+    <title>Decoded Image</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-family: Arial, sans-serif;
+        }
+        img {
+            max-width: 100%;
+            margin: 20px 0;
+        }
+        .info {
+            background: #f0f0f0;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="info">
+        <p>Format: ${image.format}</p>
+        <p>Dimensions: ${image.width}x${image.height}</p>
+    </div>
+    <img src="${image.dataUrl}" alt="Decoded image">
+</body>
+</html>`;
+
+    writeFileSync('decoded.html', html);
+  }
+
   detectFormat(bytes: Uint8Array): ImageFormat | null {
     for (const [format, signature] of Object.entries(this.formatSignatures)) {
       if (this.matchesSignature(bytes, signature)) {
@@ -69,9 +107,7 @@ class ImageDecoder implements ImageDecoderInterface {
       // Try viewBox first
       const viewBoxMatch = text.match(/viewBox=["']([^"']+)["']/);
       if (viewBoxMatch) {
-        const [width, height] = viewBoxMatch[1]
-          .split(/[\s,]+/)
-          .map(Number);
+        const [width, height] = viewBoxMatch[1].split(/[\s,]+/).map(Number);
         return { width, height };
       }
       // Try width/height attributes
@@ -219,7 +255,8 @@ async function decodeImageFile(file: File): Promise<DecodedImage> {
   const bytes = new Uint8Array(buffer);
 
   try {
-    return decoder.decode(bytes);
+    const decoded = decoder.decode(bytes);
+    return decoded;
   } catch (error) {
     throw new Error(
       `Failed to decode image: ${
@@ -230,8 +267,9 @@ async function decodeImageFile(file: File): Promise<DecodedImage> {
 }
 
 (async () => {
-  const image = await decodeImageFile(
-    new File([], 'test.jpg', { type: 'image/jpeg' })
-  );
-  console.log(image);
+  const image = readFileSync('./test.jpg');
+  const imageFile = new File([image], 'test.jpg', { type: 'image/jpeg' });
+  const decoded = await decodeImageFile(imageFile);
+  console.log(decoded);
+  decoder.createHtmlWithImage(decoded);
 })();
